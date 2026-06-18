@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>부산시 공공시설 & 무료강좌 지도</title>
+    
+    <!-- Leaflet 지도 라이브러리 CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        /* 심플한 전체 화면 디자인 */
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Malgun Gothic', sans-serif; background-color: #f8f9fa; }
+        
+        /* 상단 헤더 및 검색/필터 영역 */
+        header { background-color: white; padding: 15px 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: relative; z-index: 1000; }
+        h1 { margin: 0 0 15px 0; font-size: 20px; color: #333; text-align: center; }
+        
+        .controls { display: flex; flex-direction: column; gap: 10px; max-width: 600px; margin: 0 auto; }
+        
+        /* 검색창 스타일 */
+        .search-box { display: flex; width: 100%; }
+        .search-box input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 15px; outline: none; }
+        .search-box input:focus { border-color: #007bff; }
+        
+        /* 카테고리 버튼 스타일 */
+        .categories { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+        .category-btn { padding: 8px 16px; border: none; border-radius: 20px; cursor: pointer; font-size: 14px; font-weight: bold; background-color: #eee; color: #555; transition: 0.2s; }
+        .category-btn.active { background-color: #333; color: white; }
+        
+        /* 카테고리별 마커 색상 안내용 */
+        .btn-all.active { background-color: #333; }
+        .btn-library.active { background-color: #007bff; } /* 파란색: 도서관 */
+        .btn-sports.active { background-color: #28a745; } /* 초록색: 체육시설 */
+        .btn-culture.active { background-color: #dc3545; } /* 빨간색: 문화/강좌 */
+
+        /* 지도 영역 */
+        #map { height: calc(100vh - 120px); width: 100%; z-index: 1; }
+
+        /* 커스텀 마커(동그라미) 스타일 */
+        .custom-marker { border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.4); }
+        .marker-library { background-color: #007bff; }
+        .marker-sports { background-color: #28a745; }
+        .marker-culture { background-color: #dc3545; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>📍 부산시 공공시설 & 무료강좌</h1>
+        <div class="controls">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="시설명 또는 강좌명을 검색해보세요...">
+            </div>
+            <div class="categories">
+                <button class="category-btn btn-all active" data-category="all">전체보기</button>
+                <button class="category-btn btn-library" data-category="library">도서관</button>
+                <button class="category-btn btn-sports" data-category="sports">체육시설</button>
+                <button class="category-btn btn-culture" data-category="culture">문화/강좌</button>
+            </div>
+        </div>
+    </header>
+
+    <div id="map"></div>
+
+    <!-- Leaflet 지도 라이브러리 JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // 1. 지도 초기화 (부산시청 좌표 중심)
+        const map = L.map('map').setView([35.1795543, 129.0756416], 12);
+
+        // 심플한 배경 지도 타일 불러오기 (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 2. 가상의 부산 데이터 (나중에 실제 데이터로 교체하시면 됩니다)
+        const placesData = [
+            { id: 1, name: "부산도서관", category: "library", lat: 35.1868, lng: 128.9818, desc: "사상구에 위치한 부산의 대표 도서관입니다.", info: "무료 열람실 및 와이파이" },
+            { id: 2, name: "시민도서관", category: "library", lat: 35.1843, lng: 129.0435, desc: "초읍동에 위치한 역사 깊은 도서관.", info: "디지털 자료실 무료 이용" },
+            { id: 3, name: "사직종합운동장 보조경기장", category: "sports", lat: 35.1901, lng: 129.0578, desc: "시민 누구나 무료로 달리기 트랙을 이용할 수 있습니다.", info: "오전 6시 ~ 오후 10시 개방" },
+            { id: 4, name: "부산시민공원 잔디광장", category: "sports", lat: 35.1683, lng: 129.0572, desc: "넓은 잔디밭에서 자유로운 야외 활동이 가능합니다.", info: "연중무휴" },
+            { id: 5, name: "영화의전당 야외극장", category: "culture", lat: 35.1711, lng: 129.1270, desc: "해운대 센텀시티. 정기적으로 무료 영화 상영회를 개최합니다.", info: "매주 수요일 무료 상영" },
+            { id: 6, name: "F1963", category: "culture", lat: 35.1764, lng: 129.1147, desc: "수영구. 공장을 개조한 복합문화공간으로 무료 전시가 자주 열립니다.", info: "무료 전시 및 산책로" },
+            { id: 7, name: "청년작당소", category: "culture", lat: 35.0991, lng: 129.0305, desc: "중구 남포동. 청년들을 위한 무료 강좌와 네트워킹 공간.", info: "원데이 클래스 무료 (사전예약)" }
+        ];
+
+        // 지도에 표시될 마커들을 담을 그룹
+        const markersGroup = L.layerGroup().addTo(map);
+
+        // 3. 마커 렌더링 함수
+        function renderMarkers(data) {
+            markersGroup.clearLayers(); // 기존 마커 지우기
+
+            data.forEach(place => {
+                // 카테고리별 커스텀 마커 아이콘 설정
+                const customIcon = L.divIcon({
+                    className: `custom-marker marker-${place.category}`,
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                });
+
+                // 마커 생성 및 팝업 내용 설정
+                const marker = L.marker([place.lat, place.lng], { icon: customIcon });
+                const popupContent = `
+                    <div style="font-family: 'Malgun Gothic';">
+                        <h3 style="margin:0 0 5px 0; font-size:16px;">${place.name}</h3>
+                        <p style="margin:0 0 8px 0; font-size:13px; color:#555;">${place.desc}</p>
+                        <span style="background:#eee; padding:2px 5px; border-radius:3px; font-size:12px;">💡 ${place.info}</span>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+                markersGroup.addLayer(marker);
+            });
+        }
+
+        // 초기 화면에 전체 데이터 표시
+        renderMarkers(placesData);
+
+        // 4. 카테고리 필터 기능
+        const categoryBtns = document.querySelectorAll('.category-btn');
+        let currentCategory = 'all';
+
+        categoryBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                // 버튼 활성화 디자인 변경
+                categoryBtns.forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+
+                currentCategory = e.target.getAttribute('data-category');
+                filterData();
+            });
+        });
+
+        // 5. 검색창 기능
+        const searchInput = document.getElementById('searchInput');
+        searchInput.addEventListener('input', () => {
+            filterData();
+        });
+
+        // 6. 데이터 필터링 로직 (카테고리 + 검색어)
+        function filterData() {
+            const searchTerm = searchInput.value.toLowerCase();
+            
+            const filteredData = placesData.filter(place => {
+                const matchCategory = currentCategory === 'all' || place.category === currentCategory;
+                const matchSearch = place.name.toLowerCase().includes(searchTerm) || place.desc.toLowerCase().includes(searchTerm);
+                return matchCategory && matchSearch;
+            });
+
+            renderMarkers(filteredData);
+        }
+    </script>
+</body>
+</html>
