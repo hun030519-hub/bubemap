@@ -26,3 +26,51 @@ create table public.busan_courses (
   url text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+```
+
+3. 파이썬 스크립트나 API 크롤러를 통해 부산 공공데이터포털(data.busan.go.kr)의 데이터를 이 테이블에 주기적으로 동기화합니다.
+4. **Project Settings > API**에서 `URL`과 `anon public API key`를 확인합니다.
+
+## 로컬 실행
+
+`config.example.js`를 복사해 `config.local.js`를 만들고 Supabase 값을 넣습니다. `config.local.js`는 Git에 올라가지 않습니다.
+
+```javascript
+window.BUBIMAP_SUPABASE_CONFIG = {
+  supabaseUrl: "https://YOUR_PROJECT_REF.supabase.co",
+  supabaseAnonKey: "YOUR_SUPABASE_ANON_KEY",
+};
+```
+
+그 다음 로컬 서버를 실행합니다.
+
+```bash
+python3 -m http.server 8080
+```
+
+## Vercel 배포
+
+1. 이 폴더를 GitHub 저장소에 올립니다.
+2. Vercel에서 해당 저장소를 Import 합니다.
+3. Vercel 프로젝트의 **Settings > Environment Variables**에 아래 값을 추가합니다.
+
+```text
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+```
+
+4. 배포가 완료되면 대시보드에 생성된 퍼블릭 URL을 통해 사이트에 접속합니다.
+
+## 운영 흐름
+
+* **데이터 자동화 수집:** 백엔드 스크립트가 부산 공공데이터 API를 주기적으로 호출 및 정제하여 Supabase 테이블을 최신 상태로 유지합니다.
+* **사용자 접근:** 사용자가 웹 앱에 접속하면 브라우저의 GPS(Geolocation API)를 통해 위치 정보 제공 동의를 받습니다.
+* **위치 기반 필터링:** 사용자의 현재 좌표 기준 반경 내의 '수강료 무료' 조건 데이터를 Supabase에서 불러옵니다.
+* **인터랙티브 지도 표시:** 필터링된 결과값을 받아 지도 위에 마커로 시각화하며, 마커 클릭 시 길찾기 페이지로 연동됩니다.
+
+## 다음 확장 후보
+
+* 사용자 북마크(찜) 기능 및 개인 보관함 구현 (Supabase Auth 연동)
+* PWA(Progressive Web App) 전환으로 모바일 홈 화면 설치 지원
+* Supabase Edge Functions를 활용한 강좌 마감 임박 브라우저 푸시 알림
+* 동일한 공공시설 강좌를 수강하는 지역 주민 간의 실시간 오픈채팅 추가
