@@ -1,31 +1,30 @@
 # 🌊 부비맵 (Bubimap)
 **부산 지역 공공시설 및 강좌 통합 지도 웹 앱**
 
-Vercel + Supabase 조합으로 운영할 수 있는 실시간 위치 기반 웹 앱입니다. 사용자는 별도의 로그인 없이 현재 위치를 기반으로 부산 지역 내 무료 공공시설과 실시간 신청 가능한 강좌 현황을 지도에서 확인하고 필터링할 수 있습니다.
+Vercel + Supabase 조합으로 운영할 수 있는 실시간 위치 기반 웹 앱입니다. 사용자는 별도의 로그인 없이 브라우저 GPS를 기반으로 현재 위치를 자동 탐색하여, 부산 지역 내 무료 공공시설과 실시간 신청 가능한 강좌 현황을 지도에서 확인하고 필터링할 수 있습니다.
 
 ---
 
-## 🛠️ 기술 구성 (Tech Stack)
+## 🛠️ 기술 구성
 
-* **Frontend:** HTML / CSS / JavaScript (Kakao Map API 활용)
-* **Backend & Database:** Supabase (PostgreSQL)
+* **Frontend:** HTML / CSS / JavaScript (Leaflet Map API 활용)
+* **Backend & Database:** Supabase (PostgreSQL) / Python (데이터 수집 자동화)
 * **Hosting:** Vercel
 * **Config:** Vercel 환경변수 또는 로컬 `config.local.js`
 
 ---
 
-## ⚙️ 운영 흐름 (System Flow)
+## ⚙️ 운영 흐름
 
-1. **데이터 자동화 수집:** 백엔드 스크립트가 부산 공공데이터 API를 주기적으로 호출 및 정제하여 Supabase 테이블을 최신 상태로 유지합니다.
+1. **데이터 자동화 수집:** 백엔드 파이썬 스크립트가 부산 공공데이터 API를 주기적으로 호출 및 정제하여 Supabase 테이블을 최신 상태로 유지합니다.
 2. **사용자 접근:** 사용자가 웹 앱에 접속하면 브라우저의 GPS(Geolocation API)를 통해 위치 정보 제공 동의를 받습니다.
-3. **위치 기반 필터링:** 사용자의 현재 좌표 기준 반경 내의 '수강료 무료' 조건 데이터를 Supabase에서 불러옵니다.
-4. **인터랙티브 지도 표시:** 필터링된 결과값을 받아 지도 위에 마커로 시각화하며, 마커 클릭 시 길찾기 페이지로 연동됩니다.
+3. **위치 기반 필터링:** 사용자의 현재 좌표 기준 반경 내의 '수강료 무료' 조건 데이터를 Supabase 원격 저장소에서 불러옵니다.
+4. **인터랙티브 지도 표시:** 필터링된 결과값을 받아 지도 위에 마커로 시각화하며, 마커 클릭 시 시설 및 수강료 등 상세 정보가 표시됩니다.
 
 ---
 
-## 🚀 시작하기 (Getting Started)
+## 🗄️ Supabase 설정
 
-### 1. Supabase 설정
 1. Supabase에서 새 프로젝트를 생성합니다.
 2. **SQL Editor**에서 아래 쿼리를 실행하여 공공시설 및 강좌 데이터를 적재할 테이블을 생성합니다.
 
@@ -41,3 +40,49 @@ create table public.busan_courses (
   url text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+```
+
+3. 파이썬 스크립트(`update_data.py`)를 통해 부산 공공데이터포털(data.busan.go.kr)의 데이터를 이 테이블에 동기화합니다.
+4. **Project Settings > API**에서 `Project URL`과 `anon public API key`를 확인합니다.
+
+---
+
+## 💻 로컬 실행
+
+1. 프로젝트 폴더 내 `site` 디렉토리에 `config.local.js` 파일을 만들고 Supabase 값을 넣습니다. (보안을 위해 이 파일은 Git에 올리지 않도록 `.gitignore`에 추가합니다.)
+
+```javascript
+window.BUBIMAP_SUPABASE_CONFIG = {
+  supabaseUrl: "https://YOUR_PROJECT_REF.supabase.co",
+  supabaseAnonKey: "YOUR_SUPABASE_ANON_KEY"
+};
+```
+
+2. 터미널에서 아래 명령어로 로컬 웹 서버를 실행합니다.
+
+```bash
+cd site
+python3 -m http.server 8080
+```
+
+3. 브라우저에서 `http://localhost:8080`으로 접속하여 지도가 정상적으로 렌더링되는지 확인합니다.
+
+---
+
+## 🚀 Vercel 배포
+
+1. 완성된 프로젝트 코드를 GitHub 저장소에 Push 합니다.
+2. Vercel 대시보드에서 해당 저장소를 Import 합니다.
+3. Vercel 프로젝트의 **Settings > Environment Variables**에 아래 두 가지 환경변수를 추가합니다.
+   * `SUPABASE_URL` = `https://YOUR_PROJECT_REF.supabase.co`
+   * `SUPABASE_ANON_KEY` = `YOUR_SUPABASE_ANON_KEY`
+4. 배포가 완료되면 대시보드에 생성된 퍼블릭 도메인 URL을 통해 스마트폰 등 외부 기기에서 사이트에 접속합니다.
+
+---
+
+## 🗺️ 다음 확장 후보
+
+- [ ] 사용자 북마크(찜하기) 기능 및 개인 보관함 구현 (Supabase Auth 연동)
+- [ ] PWA(Progressive Web App) 전환으로 모바일 홈 화면 설치 지원
+- [ ] Supabase Edge Functions를 활용한 강좌 마감 임박 브라우저 푸시 알림
+- [ ] 동일한 공공시설 강좌를 수강하는 지역 주민 간의 실시간 오픈채팅 추가
